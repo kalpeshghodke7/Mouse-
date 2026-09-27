@@ -1,0 +1,8 @@
+{
+  "name": "TiltMouse",
+  "description": "USB-tethered gyroscopic steering controller and horizontal mouse with telemetry cockpit",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
+
