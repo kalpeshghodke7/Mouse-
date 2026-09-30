@@ -1,4 +1,6 @@
 @echo off
+:: Always change directory to the folder where this batch script lives
+cd /d "%~dp0"
 title TiltMouse Telemetry Gateway Launcher
 echo ======================================================================
 echo           TILTMOUSE - AUTOMATIC 1-CLICK USB GATEWAY LAUNCHER
