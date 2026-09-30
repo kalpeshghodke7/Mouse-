@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -141,7 +142,9 @@ fun TiltMouseScreen(
                 port = uiState.settings.port,
                 tickHz = if (uiState.serverStatus.currentRateHz > 0) uiState.serverStatus.currentRateHz else 60.0f,
                 sessionTimer = uiState.sessionTimeFormatted,
-                pulseAlpha = pulseAlpha
+                isSignalActive = uiState.settings.isSignalActive,
+                pulseAlpha = pulseAlpha,
+                onToggleSignal = { viewModel.toggleSignalActive() }
             )
 
             Spacer(modifier = Modifier.height(3.dp))
@@ -189,6 +192,9 @@ fun TiltMouseScreen(
                     lateralG = uiState.packet.lateralG,
                     yawRate = uiState.packet.yawRate,
                     maxRange = uiState.settings.maxAngleRange,
+                    isSignalActive = uiState.settings.isSignalActive,
+                    pulseAlpha = pulseAlpha,
+                    onToggleSignal = { viewModel.toggleSignalActive() },
                     modifier = Modifier
                         .weight(1.9f)
                         .fillMaxHeight()
@@ -217,6 +223,8 @@ fun TiltMouseScreen(
             DesktopCursorMappingBar(
                 normalizedX = uiState.packet.normalizedX,
                 yRatio = uiState.settings.lockedYRatio,
+                isSignalActive = uiState.settings.isSignalActive,
+                onToggleSignal = { viewModel.toggleSignalActive() },
                 onYRatioChanged = { viewModel.setLockedYRatio(it) },
                 onOpenYAdjust = { showYAdjustDialog = true }
             )
@@ -281,7 +289,9 @@ private fun HeaderTelemetryBar(
     port: Int,
     tickHz: Float,
     sessionTimer: String,
-    pulseAlpha: Float
+    isSignalActive: Boolean,
+    pulseAlpha: Float,
+    onToggleSignal: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -293,7 +303,7 @@ private fun HeaderTelemetryBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // ADB Bridge Status
+        // ADB Bridge Status + Interactive Bridge Toggle Badge
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -317,6 +327,39 @@ private fun HeaderTelemetryBar(
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace
             )
+
+            // Header Signal Pause/Active quick pill
+            Surface(
+                color = if (isSignalActive) CockpitInnerCard else Color(0xFF261805),
+                shape = RoundedCornerShape(4.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isSignalActive) NeonGreen.copy(alpha = 0.6f) else NeonAmber
+                ),
+                modifier = Modifier
+                    .clickable { onToggleSignal() }
+                    .testTag("header_signal_toggle")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(if (isSignalActive) NeonGreen.copy(alpha = pulseAlpha) else NeonAmber)
+                    )
+                    Text(
+                        text = if (isSignalActive) "LIVE" else "PAUSED",
+                        color = if (isSignalActive) NeonGreen else NeonAmber,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
 
         // Metrics: Port, Tick, Latency
@@ -472,13 +515,13 @@ private fun LeftCockpitWing(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Paddle Left: SHIFT -
+        // 1. Paddle Left: SHIFT -
         Card(
             colors = CardDefaults.cardColors(containerColor = CockpitCardBg),
             border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onShiftDown() }
@@ -487,35 +530,34 @@ private fun LeftCockpitWing(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("PADDLE LEFT", color = TextMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Text("SHIFT -", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    Text("GEAR DOWN / DRS", color = NeonRed, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text("PADDLE LEFT", color = TextMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
+                    Text("SHIFT -", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                 }
                 Surface(
                     color = CockpitInnerCard,
                     border = androidx.compose.foundation.BorderStroke(1.dp, NeonRed.copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("-1", color = NeonRed, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    Text("-1", color = NeonRed, fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
             }
         }
 
-        // GYRO ORIGIN & ZERO CALIBRATE CARD
+        // 2. GYRO ORIGIN & ZERO CALIBRATE CARD
         Card(
             colors = CardDefaults.cardColors(containerColor = CockpitCardBg),
             border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -523,50 +565,15 @@ private fun LeftCockpitWing(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(Icons.Default.Speed, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
-                        Text("GYRO ORIGIN", color = TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    }
-                    Surface(
-                        color = CockpitInnerCard,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
+                        Icon(Icons.Default.Speed, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(11.dp))
                         Text(
                             text = if (isCalibrated) "0.0° LOCK" else "RAW BASE",
                             color = NeonCyan,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            fontFamily = FontFamily.Monospace
                         )
                     }
-                }
-
-                // Big ZERO CALIBRATE Button
-                Button(
-                    onClick = onCalibrateZero,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CockpitInnerCard,
-                        contentColor = NeonCyan
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, NeonCyan.copy(alpha = 0.7f)),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .testTag("zero_calibrate_button")
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Zero Calibrate", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("❖ ZERO CALIBRATE", fontWeight = FontWeight.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("DEADBAND: ±1.5°", color = TextSecondary, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                     Surface(
                         color = CockpitInnerCard,
                         border = androidx.compose.foundation.BorderStroke(1.dp, if (isInverted) NeonAmber else CockpitBorder),
@@ -583,106 +590,98 @@ private fun LeftCockpitWing(
                         )
                     }
                 }
+
+                // ZERO CALIBRATE Button
+                Button(
+                    onClick = onCalibrateZero,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CockpitInnerCard,
+                        contentColor = NeonCyan
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.7f)),
+                    shape = RoundedCornerShape(5.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .testTag("zero_calibrate_button")
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Zero Calibrate", modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("❖ ZERO CALIBRATE", fontWeight = FontWeight.Black, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                }
             }
         }
 
-        // SIGNAL ON / ACTIVE [TAP TO PAUSE] & E-BRAKE
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // 3. PROMINENT DEDICATED BRIDGE PAUSE / LIVE SIGNAL ROCKER SWITCH
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSignalActive) CockpitCardBg else Color(0xFF261805)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                if (isSignalActive) NeonGreen.copy(alpha = 0.8f) else NeonAmber
+            ),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggleSignal() }
+                .testTag("bridge_pause_button")
         ) {
-            // Live Signal Toggle
-            Surface(
-                color = CockpitCardBg,
-                shape = RoundedCornerShape(6.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (isSignalActive) NeonGreen.copy(alpha = 0.7f) else NeonAmber.copy(alpha = 0.7f)
-                ),
+            Row(
                 modifier = Modifier
-                    .weight(1.3f)
-                    .height(48.dp)
-                    .clickable { onToggleSignal() }
-                    .testTag("signal_active_toggle")
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(4.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(if (isSignalActive) NeonGreen.copy(alpha = pulseAlpha) else NeonAmber.copy(alpha = pulseAlpha))
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(if (isSignalActive) NeonGreen.copy(alpha = pulseAlpha) else NeonAmber)
+                    )
+                    Column {
+                        Text(
+                            text = if (isSignalActive) "BRIDGE: ACTIVE" else "BRIDGE: PAUSED",
+                            color = if (isSignalActive) NeonGreen else NeonAmber,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
                         )
                         Text(
-                            text = if (isSignalActive) "SIGNAL ON" else "SIGNAL OFF",
-                            color = if (isSignalActive) NeonGreen else NeonAmber,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = if (isSignalActive) "SIGNAL ON • TAP TO PAUSE" else "CURSOR FROZEN • TAP TO RESUME",
+                            color = if (isSignalActive) TextMuted else NeonAmber.copy(alpha = 0.9f),
+                            fontSize = 6.5.sp,
+                            fontWeight = FontWeight.SemiBold,
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    Text(
-                        text = if (isSignalActive) "ACTIVE" else "PAUSED",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = if (isSignalActive) "[TAP TO PAUSE]" else "[TAP TO RESUME]",
-                        color = TextMuted,
-                        fontSize = 7.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
                 }
-            }
 
-            // E-Brake Button
-            Surface(
-                color = if (isEbrake) NeonRed.copy(alpha = 0.25f) else CockpitCardBg,
-                shape = RoundedCornerShape(6.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (isEbrake) NeonRed else CockpitBorder
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clickable { onToggleEbrake() }
-                    .testTag("ebrake_button")
-            ) {
-                Column(
-                    modifier = Modifier.padding(4.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    color = if (isSignalActive) NeonGreen.copy(alpha = 0.2f) else NeonAmber.copy(alpha = 0.3f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isSignalActive) NeonGreen.copy(alpha = 0.7f) else NeonAmber
+                    ),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("! E-BRAKE", color = NeonRed, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     Text(
-                        text = if (isEbrake) "LOCKED" else "PULL",
-                        color = if (isEbrake) NeonRed else Color.White,
-                        fontSize = 11.sp,
+                        text = if (isSignalActive) "PAUSE" else "RESUME",
+                        color = if (isSignalActive) NeonGreen else NeonAmber,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.dp)
                     )
                 }
             }
         }
-
-        // Left thumb indicator
-        Text(
-            text = ":: LEFT THUMB PIVOT ZONE ::",
-            color = TextMuted,
-            fontSize = 7.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
     }
 }
 
@@ -696,44 +695,61 @@ private fun CenterCockpitHud(
     lateralG: Float,
     yawRate: Float,
     maxRange: Float,
+    isSignalActive: Boolean,
+    pulseAlpha: Float,
+    onToggleSignal: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CockpitCardBg),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorderCyan),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isSignalActive) CockpitBorderCyan else NeonAmber.copy(alpha = 0.8f)
+        ),
         shape = RoundedCornerShape(10.dp),
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Pill: • 1:1 DIRECT VIRTUAL AXIS [LOCKED]
+            // Top Interactive Pill: Master Bridge Signal Status & Toggle
             Surface(
-                color = CockpitInnerCard,
+                color = if (isSignalActive) CockpitInnerCard else Color(0xFF261805),
                 shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isSignalActive) NeonGreen.copy(alpha = 0.6f) else NeonAmber
+                ),
+                modifier = Modifier
+                    .clickable { onToggleSignal() }
+                    .testTag("center_bridge_toggle")
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NeonCyan))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(if (isSignalActive) NeonGreen.copy(alpha = pulseAlpha) else NeonAmber)
+                    )
                     Text(
-                        text = "1:1 DIRECT VIRTUAL AXIS [LOCKED]",
-                        color = NeonCyan,
-                        fontSize = 9.sp,
+                        text = if (isSignalActive) "BRIDGE TRANSMIT: ACTIVE [TAP TO PAUSE]" else "BRIDGE SIGNAL: PAUSED [TAP TO RESUME]",
+                        color = if (isSignalActive) NeonGreen else NeonAmber,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
 
-            // Radial Steering Gauge
+            // Radial Steering Gauge with In-Gauge Paused Overlay
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -748,6 +764,33 @@ private fun CenterCockpitHud(
                     maxRange = maxRange,
                     modifier = Modifier.fillMaxHeight()
                 )
+
+                if (!isSignalActive) {
+                    Surface(
+                        color = Color(0xE6100808),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonAmber),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 18.dp)
+                            .clickable { onToggleSignal() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NeonAmber))
+                            Text(
+                                "CURSOR FROZEN (SIGNAL MUTED)",
+                                color = NeonAmber,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -769,13 +812,13 @@ private fun RightCockpitWing(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // Paddle Right: SHIFT +
         Card(
             colors = CardDefaults.cardColors(containerColor = CockpitCardBg),
             border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onShiftUp() }
@@ -784,7 +827,7 @@ private fun RightCockpitWing(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -793,12 +836,11 @@ private fun RightCockpitWing(
                     border = androidx.compose.foundation.BorderStroke(1.dp, NeonGreen.copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("+1", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    Text("+1", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("PADDLE RIGHT", color = TextMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Text("SHIFT +", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    Text("GEAR UP / BOOST", color = NeonGreen, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text("PADDLE RIGHT", color = TextMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
+                    Text("SHIFT +", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                 }
             }
         }
@@ -807,12 +849,12 @@ private fun RightCockpitWing(
         Card(
             colors = CardDefaults.cardColors(containerColor = CockpitCardBg),
             border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -820,18 +862,18 @@ private fun RightCockpitWing(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(Icons.Default.Tune, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
-                        Text("STEER PROFILE", color = TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Icon(Icons.Default.Tune, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(11.dp))
+                        Text("STEER PROFILE", color = TextPrimary, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
                     Surface(
                         color = CockpitInnerCard,
                         border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(3.dp)
                     ) {
                         Text(
                             text = if (steerProfile == SteerProfile.PRO_RACING_90) "90° DRIFT" else "180° PRO",
                             color = NeonCyan,
-                            fontSize = 8.sp,
+                            fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -842,7 +884,7 @@ private fun RightCockpitWing(
                 // Profile Selector Box
                 Surface(
                     color = CockpitInnerCard,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(5.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -852,88 +894,68 @@ private fun RightCockpitWing(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(steerProfile.title, color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            Text(steerProfile.responseDesc, color = TextMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                            Text(steerProfile.title, color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            Text(steerProfile.responseDesc, color = TextMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
                         }
-                        Icon(Icons.Default.Refresh, contentDescription = "Cycle Profile", tint = TextSecondary, modifier = Modifier.size(14.dp))
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("HOST MOUSE LOCK:", color = TextSecondary, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(10.dp))
-                        Text("STRICT ON", color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Icon(Icons.Default.Refresh, contentDescription = "Cycle Profile", tint = TextSecondary, modifier = Modifier.size(13.dp))
                     }
                 }
             }
         }
 
-        // FLASH PASS LIGHTS & PACKET RATE
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // FLASH PASS LIGHTS CARD
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (isFlashing) NeonAmber.copy(alpha = 0.25f) else CockpitCardBg
+            ),
+            shape = RoundedCornerShape(6.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isFlashing) NeonAmber else CockpitBorder
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onFlashLights() }
+                .testTag("flash_lights_button")
         ) {
-            // Flash Pass
-            Surface(
-                color = if (isFlashing) NeonAmber.copy(alpha = 0.35f) else CockpitCardBg,
-                shape = RoundedCornerShape(6.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (isFlashing) NeonAmber else CockpitBorder),
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clickable { onFlashLights() }
-                    .testTag("flash_lights_button")
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(4.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(14.dp))
-                    Text("FLASH PASS", color = TextSecondary, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
-                    Text("LIGHTS", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Column {
+                        Text("PASS LIGHTS", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text("HEADLIGHT FLASH", color = TextMuted, fontSize = 6.5.sp, fontFamily = FontFamily.Monospace)
+                    }
                 }
-            }
-
-            // Packet Rate
-            Surface(
-                color = CockpitCardBg,
-                shape = RoundedCornerShape(6.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-                modifier = Modifier
-                    .weight(1.3f)
-                    .height(48.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(4.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    color = CockpitInnerCard,
+                    shape = RoundedCornerShape(4.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder)
                 ) {
-                    Text("PACKET RATE", color = TextMuted, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
-                    Text("60 PPS", color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    Text("0 DROPPED", color = NeonGreen, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = "FLASH",
+                        color = NeonAmber,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
                 }
             }
         }
-
-        // Right thumb indicator
-        Text(
-            text = ":: RIGHT THUMB PIVOT ZONE ::",
-            color = TextMuted,
-            fontSize = 7.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
     }
 }
 
@@ -944,6 +966,8 @@ private fun RightCockpitWing(
 private fun DesktopCursorMappingBar(
     normalizedX: Float,
     yRatio: Float,
+    isSignalActive: Boolean = true,
+    onToggleSignal: () -> Unit = {},
     onYRatioChanged: (Float) -> Unit,
     onOpenYAdjust: () -> Unit
 ) {
@@ -969,7 +993,7 @@ private fun DesktopCursorMappingBar(
                     modifier = Modifier
                         .size(10.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(NeonCyan)
+                        .background(if (isSignalActive) NeonCyan else NeonAmber)
                 )
                 Text(
                     text = "Desktop Cursor Mapping:",
@@ -978,12 +1002,30 @@ private fun DesktopCursorMappingBar(
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
-                Text(
-                    text = "[DRAG Y-HEIGHT / TAP TO ADJUST]",
-                    color = TextMuted,
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+                if (!isSignalActive) {
+                    Surface(
+                        color = Color(0xFF3D2005),
+                        shape = RoundedCornerShape(3.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonAmber),
+                        modifier = Modifier.clickable { onToggleSignal() }
+                    ) {
+                        Text(
+                            text = "[FROZEN / PAUSED]",
+                            color = NeonAmber,
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "[DRAG Y-HEIGHT / TAP TO ADJUST]",
+                        color = TextMuted,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
 
             // Calculation assuming standard 1920x1080 display
